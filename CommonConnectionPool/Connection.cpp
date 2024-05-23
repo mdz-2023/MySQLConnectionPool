@@ -27,7 +27,7 @@ bool Connection::connect(string ip, unsigned short port, string user, string pas
 bool Connection::update(string sql)
 {
 	if (mysql_query(_conn, sql.c_str())) {
-		LOG("¸üÐÂÊ§°Ü£º" + string(mysql_error(_conn)));
+		LOG("æ›´æ–°å¤±è´¥ï¼š" + string(mysql_error(_conn)));
 		return false;
 	}
 	return true;
@@ -36,7 +36,7 @@ bool Connection::update(string sql)
 MYSQL_RES* Connection::query(string sql)
 {
 	if (mysql_query(_conn, sql.c_str())) {
-		LOG("²éÑ¯Ê§°Ü£º" + sql);
+		LOG("æŸ¥è¯¢å¤±è´¥ï¼š" + sql);
 		return nullptr;
 	}
 	return mysql_use_result(_conn);

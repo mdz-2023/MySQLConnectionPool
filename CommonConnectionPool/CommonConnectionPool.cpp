@@ -4,10 +4,10 @@
 #include <functional>
 #include <thread>
 
-//�̰߳�ȫ������ʽ���� �����ӿ�
+//线程安全的懒汉式单例 函数接口
 CommonConnectionPool* CommonConnectionPool::getConnectionPool()
 {
-	static CommonConnectionPool connPool; // ϵͳΪ��̬�����Զ����߳��� lock unlock
+	static CommonConnectionPool connPool; // 系统为静态变量自动加线程锁 lock unlock
 	return &connPool;
 }
 
@@ -15,33 +15,33 @@ shared_ptr<Connection> CommonConnectionPool::getConnection()
 {
 	unique_lock<mutex> lock(_queueMutex);
 	while (_connectionQue.empty()) {
-		// ����Ϊ�վ͵ȴ�һ��ʱ�䣬���ʱ����һֱ�ȴ������߻���
-		// ѭ����Ϊ����������ʱ����������������ռ����Դ�����Ҿͼ����ȴ�
+		// 队列为空就等待一段时间，这段时间内一直等待生产者唤醒
+		// 循环是为了再醒来的时候有其他消费者抢占了资源，那我就继续等待
 		if (cv_status::timeout == cv.wait_for(lock, chrono::milliseconds(_connectionTimeout))){
-			// ����ڳ�ʱ������
+			// 如果在超时后醒来
 			if (_connectionQue.empty()) {
-				LOG("��ȡ�������ӳ�ʱ...��ȡ����ʧ�ܣ�");
+				LOG("获取空闲连接超时...获取连接失败！");
 				return nullptr;
 			}
 		}
 		
 	}
 	/*
-	shared_ptr����ָ������ʱ�����Connection��Դֱ��delete����
-	�൱�ڵ���Connection������������connection�ͱ�close����
-	������Ҫ�Զ���shared_ptr����Դ�ͷŷ�ʽ����connectionֱ�ӹ黹��queue��
-	���캯���ĵڶ�����������һ���Զ����ָ����պ���������ֱ��дlambda����ʽ
+	shared_ptr智能指针析构时，会把Connection资源直接delete掉，
+	相当于调用Connection的析构函数，connection就被close掉了
+	这里需要自定义shared_ptr的资源释放方式，把connection直接归还到queue中
+	构造函数的第二个参数传入一个自定义的指针回收函数，这里直接写lambda表达式
 	*/
 	shared_ptr<Connection> sp(_connectionQue.front(), [&](Connection* pcon) {
-		//�������ڷ�����Ӧ���߳��е��õģ�����Ҫ���Ƕ��е��̰߳�ȫ
-		// �˺�����sp�뿪�����ڵ�ʱ���Զ�����
+		//这里是在服务器应用线程中调用的，所以要考虑队列的线程安全
+		// 此函数在sp离开作用于的时候自动调用
 		unique_lock<mutex> lock(_queueMutex);
 		_connectionQue.push(pcon);
 		pcon->refreshAliveTime();
 		}
 	);
 	_connectionQue.pop();
-	cv.notify_all();// ����������֮��֪ͨ�������̼߳��һ�£��������Ϊ�գ�����������
+	cv.notify_all();// 消费完链接之后，通知生产者线程检查一下，如果队列为空，生产新连接
 
 	return sp;
 }
@@ -49,10 +49,10 @@ shared_ptr<Connection> CommonConnectionPool::getConnection()
 CommonConnectionPool::CommonConnectionPool()
 {
 	if (!loadConfigFile()) {
-		LOG("�����ļ�����");
+		LOG("配置文件有误");
 	}
 
-	// ������ʼ����������
+	// 创建初始数量的连接
 	for (auto i = 0; i < _initSize; ++i) {
 		Connection* p = new Connection();
 		//cout << p << endl;
@@ -62,29 +62,29 @@ CommonConnectionPool::CommonConnectionPool()
 		_connectionCnt++;
 	}
 
-	// ����һ���µ��߳���Ϊ���ӵ������ߣ��������ڳ�ʼ����������
-	// ���� std::thread ����ʱ�����Դ��ݸ���һ���ɵ��ö������纯������������lambda����ʽ�ȣ�
-	// ����ɵ��ö��������߳���ִ�С�
+	// 启动一个新的线程作为连接的生产者，生产多于初始数量的连接
+	// 创建 std::thread 对象时，可以传递给它一个可调用对象（例如函数、函数对象、lambda表达式等）
+	// 这个可调用对象将在新线程中执行。
 	// 
-	// std::bind ��һ������ģ�壬��������һ���ɵ��ö���
-	// �����Խ�һ����Ա������һ������ʵ������һ������һ����������ͨ����һ�����õĶ���
-	thread produce(std::bind(&CommonConnectionPool::produceConnectionTask, this));// �������̶߳���
-	produce.detach();// �ػ��߳�
-	// ��һ�ֵ��÷�����lambda����ʽͨ�� & �����˵�ǰ���������
+	// std::bind 是一个函数模板，用于生成一个可调用对象
+	// 它可以将一个成员函数与一个对象实例绑定在一起，生成一个可以像普通函数一样调用的对象
+	thread produce(std::bind(&CommonConnectionPool::produceConnectionTask, this));// 生产者线程对象
+	produce.detach();// 守护线程
+	// 另一种调用方法，lambda表达式通过 & 捕获了当前对象的引用
 	//thread produce([&]() {this->produceConnectionTask(); }); 
 
 
-	//����һ���µĶ�ʱ�̣߳�ɨ�賬��maxIdleTimeʱ��Ŀ������ӣ����л���
+	//启动一个新的定时线程，扫描超过maxIdleTime时间的空闲连接，进行回收
 	thread scanner([&]() {this->scannerConnectionTask(); });
 	scanner.detach();
 }
 
 bool CommonConnectionPool::loadConfigFile()
 {
-	ifstream infile; // ֻ���ļ�����
-	infile.open("mysql.ini");
+	ifstream infile; // 只读文件对象
+	infile.open("../mysql.conf");
 	if (infile.is_open() == false) {
-		LOG("mysql.ini file is not exist!");
+		LOG("mysql.conf file is not exist!");
 		return false;
 	}
 	string line;
@@ -128,19 +128,19 @@ bool CommonConnectionPool::loadConfigFile()
 
 void CommonConnectionPool::produceConnectionTask()
 {
-	// ������ȷ���˶Զ��е��̰߳�ȫ����
-	// �������������ڶ���Ϊ��ʱʹ�������̵߳ȴ����Լ��ڶ�������������ʱ֪ͨ�������߳�
+	// 互斥锁确保了对队列的线程安全访问
+	// 条件变量用于在队列为空时使生产者线程等待，以及在队列中有新连接时通知消费者线程
 	while (1) {
-		unique_lock<mutex> lock(_queueMutex); // �������̰߳�ȫ
-		// ��������ͨ���뻥����һ��ʹ�ã��Ա��ڶ��̻߳����а�ȫ�صȴ�ĳ����������
+		unique_lock<mutex> lock(_queueMutex); // 上锁，线程安全
+		// 条件变量通常与互斥锁一起使用，以便在多线程环境中安全地等待某个条件成立
 		while (!_connectionQue.empty()) {
-			cv.wait(lock); // ʹ��ǰ�̵߳ȴ�,�Զ���������״̬,����Ҫ�ֶ���������������������
-			//���в��գ��˴������߳̽���ȴ�״̬��ͬʱ�ͷ� _queueMutex ��
-			// ֱ���������������ˣ��˴��ӵ�֪ͨ���� wait ���÷���
-			// ���� lock ���Զ����»�ȡ������
+			cv.wait(lock); // 使当前线程等待,自动管理锁的状态,不需要手动解锁和重新锁定互斥锁
+			//队列不空，此处生产线程进入等待状态，同时释放 _queueMutex 锁
+			// 直到消费者消费完了，此处接到通知才能 wait 调用返回
+			// 并且 lock 会自动重新获取互斥锁
 		}
 
-		// ��������û�дﵽ���ޣ����������µ�����
+		// 连接数量没有达到上限，继续创建新的连接
 		if (_connectionCnt < _maxSize) {
 			Connection* p = new Connection();
 			p->connect(_ip, _port, _username, _password, _dbname);
@@ -149,7 +149,7 @@ void CommonConnectionPool::produceConnectionTask()
 			_connectionCnt++;
 		}
 
-		// ֪ͨ�������̣߳���������������
+		// 通知消费者线程，可以消费连接了
 		cv.notify_all();
 	}
 }
@@ -157,19 +157,19 @@ void CommonConnectionPool::produceConnectionTask()
 void CommonConnectionPool::scannerConnectionTask()
 {
 	while (1) {
-		this_thread::sleep_for(chrono::seconds(_maxIdleTime)); // ˯�ߵȴ����ӿ��г�ʱ
+		this_thread::sleep_for(chrono::seconds(_maxIdleTime)); // 睡眠等待连接空闲超时
 
-		//ɨ���������У��ͷŶ�������
-		unique_lock<mutex> lock(_queueMutex); // �Զ���������
+		//扫描整个队列，释放多余连接
+		unique_lock<mutex> lock(_queueMutex); // 自动加锁解锁
 		while (_connectionCnt > _initSize) {
 			Connection* p = _connectionQue.front();
 			if (p->getAliveTime() >= chrono::duration<double>(_maxIdleTime)) {
 				_connectionQue.pop();
 				_connectionCnt--;
-				delete p;// ����~Connection() �ͷ�����
+				delete p;// 调用~Connection() 释放连接
 			}
 			else {
-				break; // ��ͷ��δ��ʱ��������Ҳ��
+				break; // 队头的未超时，其他的也不
 			}
 		}
 	}

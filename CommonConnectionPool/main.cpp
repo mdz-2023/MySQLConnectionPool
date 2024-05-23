@@ -21,7 +21,7 @@ int main() {
 	//		conn.update(string("insert into user(name,age,sex) value('zhang san','20','male')"));
 	//	}
 	//}
-	for (int i = 0; i < 10000; ++i) {
+	for (int i = 0; i < 2; ++i) {
 		CommonConnectionPool* cp = CommonConnectionPool::getConnectionPool();
 		shared_ptr<Connection> sp = cp->getConnection();
 		sp->update(string("insert into user(name,age,sex) value('zhang san','20','male')"));

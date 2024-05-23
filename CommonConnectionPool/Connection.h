@@ -5,34 +5,34 @@
 #include <chrono>
 using namespace std;
 /*
-* ½¨Á¢Êı¾İ¿âÁ¬½Ó£¬·â×°²Ù×÷º¯Êı
-* Êı¾İ¿âÔöÉ¾¸Ä²éÏà¹ØµÄ¹¦ÄÜ
+* å»ºç«‹æ•°æ®åº“è¿æ¥ï¼Œå°è£…æ“ä½œå‡½æ•°
+* æ•°æ®åº“å¢åˆ æ”¹æŸ¥ç›¸å…³çš„åŠŸèƒ½
 */
 class Connection
 {
 public:
-	//³õÊ¼»¯Êı¾İ¿âÁ¬½Ó
+	//åˆå§‹åŒ–æ•°æ®åº“è¿æ¥
 	Connection();
-	//ÊÍ·ÅÊı¾İ¿âÁ¬½Ó×ÊÔ´
+	//é‡Šæ”¾æ•°æ®åº“è¿æ¥èµ„æº
 	~Connection();
 
-	// Á¬½ÓÊı¾İ¿â
+	// è¿æ¥æ•°æ®åº“
 	bool connect(string ip, unsigned short port,
 		string user, string password, string dbname);
 
-	// ¸üĞÂ²Ù×÷ insrt delete update
+	// æ›´æ–°æ“ä½œ insrt delete update
 	bool update(string sql);
 
-	// ²éÑ¯²Ù×÷ select
+	// æŸ¥è¯¢æ“ä½œ select
 	MYSQL_RES* query(string sql);
 
-	// Ë¢ĞÂÁ¬½ÓµÄÆğÊ¼¿ÕÏĞÊ±¼ä
+	// åˆ·æ–°è¿æ¥çš„èµ·å§‹ç©ºé—²æ—¶é—´
 	void refreshAliveTime() { _aliveTime = std::chrono::high_resolution_clock::now(); }
-	// ·µ»Ø±¾Á¬½ÓµÄ¿ÕÏĞÊ±¼ä
+	// è¿”å›æœ¬è¿æ¥çš„ç©ºé—²æ—¶é—´
 	std::chrono::duration<double> getAliveTime() { return std::chrono::high_resolution_clock::now() - _aliveTime; }
 
 private:
-	MYSQL* _conn; // ±íÊ¾ºÍMySQL ServerµÄÒ»ÌõÁ¬½Ó
-	chrono::high_resolution_clock::time_point _aliveTime; // ¼ÇÂ¼½øÈë¿ÕÏĞ×´Ì¬ºóµÄÆğÊ¼Ê±¼ä
+	MYSQL* _conn; // è¡¨ç¤ºå’ŒMySQL Serverçš„ä¸€æ¡è¿æ¥
+	chrono::high_resolution_clock::time_point _aliveTime; // è®°å½•è¿›å…¥ç©ºé—²çŠ¶æ€åçš„èµ·å§‹æ—¶é—´
 };
 
