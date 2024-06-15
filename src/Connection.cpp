@@ -15,7 +15,11 @@ Connection::~Connection()
 
 bool Connection::connect(string ip, unsigned short port, string user, string password, string dbname)
 {
-	MYSQL* p = mysql_real_connect(_conn, ip.c_str(), user.c_str(), password.c_str(), dbname.c_str(), port, nullptr, 0);
+	// std::cout << ip << std::endl;
+	// std::cout <<"ip="<< ip << "1" << port << " "  << user << " "  << password << " "  << dbname << std::endl;
+	MYSQL* p = mysql_real_connect(_conn, ip.c_str(), user.c_str(), password.c_str(),
+								    dbname.c_str(), port, nullptr, 0);
+	// MYSQL* p = mysql_real_connect(_conn, "127.0.0.1", "root", "123456", "chat", 3306, nullptr, 0);
 	if (p == nullptr) {
 		cout << _conn  << endl;
 		LOG("Conncet error: " + string(mysql_error(_conn)));

@@ -21,10 +21,11 @@ int main() {
 	//		conn.update(string("insert into user(name,age,sex) value('zhang san','20','male')"));
 	//	}
 	//}
-	for (int i = 0; i < 2; ++i) {
+	for (int i = 0; i < 1; ++i) {
 		CommonConnectionPool* cp = CommonConnectionPool::getConnectionPool();
 		shared_ptr<Connection> sp = cp->getConnection();
-		sp->update(string("insert into user(name,age,sex) value('zhang san','20','male')"));
+		// sp->update(string("insert into user(name,password) value('zhang san0','23446')"));
+		sp->update(string("update password='12222' from user where name='zhang san'"));
 	}
 
 	auto end = std::chrono::high_resolution_clock::now();

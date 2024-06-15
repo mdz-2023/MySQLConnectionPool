@@ -5,10 +5,15 @@ project(myConnPool)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -std=c++14 -fPIC")
 
 include_directories("/usr/include/mysql")
-link_libraries()
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # 定义参与编译的源代码文件 
-aux_source_directory(. SRC_LIST)
+# aux_source_directory(. SRC_LIST)
+set(SRC_LIST 
+    ${PROJECT_SOURCE_DIR}/src/CommonConnectionPool.cpp
+    ${PROJECT_SOURCE_DIR}/src/Connection.cpp
+    ${PROJECT_SOURCE_DIR}/src/main.cpp
+)
 
 # 编译生成动态库
 add_library(myConnPool SHARED ${SRC_LIST})

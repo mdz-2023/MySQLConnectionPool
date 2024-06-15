@@ -82,7 +82,7 @@ CommonConnectionPool::CommonConnectionPool()
 bool CommonConnectionPool::loadConfigFile()
 {
 	ifstream infile; // 只读文件对象
-	infile.open("../mysql.conf");
+	infile.open("mysql.conf");
 	if (infile.is_open() == false) {
 		LOG("mysql.conf file is not exist!");
 		return false;
@@ -93,10 +93,18 @@ bool CommonConnectionPool::loadConfigFile()
 		if (idx == string::npos) {
 			continue;
 		}
+		// std::cout << line << endl;
+		// std::cout << idx << " " << line.size() << endl;
+
 		string key = line.substr(0, idx);
-		string value = line.substr(idx + 1, line.size() - idx - 1);
+		
+        int endidx = line.find('\r', idx);
+        string value = line.substr(idx+1, endidx-idx-1);
+		// std::cout << key << " " << value << std::endl;
+		// string value = line.substr(idx + 1, line.size() - idx - 1);
 		if (key == "ip") {
 			_ip = value;
+			std::cout << _ip << std::endl;
 		}
 		else if (key == "port") {
 			_port = stoi(value);
